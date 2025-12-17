@@ -12,13 +12,22 @@ function detectVideos() {
     element: i
   })).filter(i => i.src);
 
+  // Detect .m3u8 links in anchor tags
+  const m3u8Links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href$=".m3u8"]'))
+    .map(a => ({ type: 'stream', src: a.href }))
+    .filter(l => l.src);
+
   // Send found videos to background script
-  const count = videos.length + iframes.length;
+  const count = videos.length + iframes.length + m3u8Links.length;
   if (count > 0) {
     chrome.runtime.sendMessage({
       type: 'VIDEOS_FOUND',
       count,
-      videos: [...videos.map(v => ({ type: v.type, src: v.src })), ...iframes.map(i => ({ type: i.type, src: i.src }))]
+      videos: [
+        ...videos.map(v => ({ type: v.type, src: v.src })),
+        ...iframes.map(i => ({ type: i.type, src: i.src })),
+        ...m3u8Links
+      ]
     });
   }
 }
@@ -40,6 +49,11 @@ chrome.runtime.onMessage.addListener((message: any, _sender: chrome.runtime.Mess
       .map(i => ({ type: 'iframe', src: i.src }))
       .filter(i => i.src);
 
-    sendResponse({ videos: [...videos, ...iframes] });
+    // Detect .m3u8 links in anchor tags
+    const m3u8Links = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href$=".m3u8"]'))
+      .map(a => ({ type: 'stream', src: a.href }))
+      .filter(l => l.src);
+
+    sendResponse({ videos: [...videos, ...iframes, ...m3u8Links] });
   }
 });

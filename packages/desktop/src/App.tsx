@@ -39,6 +39,12 @@ const FolderIcon = () => (
   </svg>
 );
 
+const BulkIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+  </svg>
+);
+
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -51,6 +57,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [showBulkAdd, setShowBulkAdd] = useState<{ lessonId: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'manual' | 'import'>('manual');
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<{ completed: number; total: number } | null>(null);
 
@@ -59,6 +67,8 @@ function App() {
   const [newProjectLocation, setNewProjectLocation] = useState('');
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [lessonCount, setLessonCount] = useState(1);
+  const [importContent, setImportContent] = useState('');
+  const [bulkUrls, setBulkUrls] = useState('');
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
 
   const loadProjects = useCallback(async () => {
@@ -89,22 +99,51 @@ function App() {
     e.preventDefault();
     if (!newProjectName || !newProjectLocation) return;
 
+    // Parse lessons if in import mode
+    let lessonsToAdd: { title: string, order: number }[] = [];
+
+    if (activeTab === 'import') {
+      try {
+        // Try JSON first
+        if (importContent.trim().startsWith('{')) {
+          const data = JSON.parse(importContent);
+          if (data.name && !newProjectName) setNewProjectName(data.name);
+          if (Array.isArray(data.lessons)) {
+            lessonsToAdd = data.lessons.map((title: string, i: number) => ({ title, order: i + 1 }));
+          }
+        } else {
+          // Fallback to text lines
+          lessonsToAdd = importContent
+            .split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map((title, i) => ({ title, order: i + 1 }));
+        }
+      } catch (e) {
+        setError('Invalid template format');
+        return;
+      }
+    } else {
+      // Manual mode
+      for (let i = 1; i <= lessonCount; i++) {
+        lessonsToAdd.push({ title: `Lesson ${i}`, order: i });
+      }
+    }
+
     try {
       const project = await createProject({
         name: newProjectName,
         save_location: newProjectLocation,
       });
 
-      // Add lessons based on count
-      for (let i = 1; i <= lessonCount; i++) {
-        await addLesson(project.id, { title: `Lesson ${i}`, order: i });
+      // Add lessons
+      for (const lesson of lessonsToAdd) {
+        await addLesson(project.id, lesson);
       }
 
       await loadProjects();
       setShowNewProject(false);
-      setNewProjectName('');
-      setNewProjectLocation('');
-      setLessonCount(1);
+      resetForms();
 
       // Select the new project
       const updated = await fetchProjects();
@@ -113,6 +152,15 @@ function App() {
     } catch (err) {
       setError('Failed to create project');
     }
+  };
+
+  const resetForms = () => {
+    setNewProjectName('');
+    setNewProjectLocation('');
+    setLessonCount(1);
+    setImportContent('');
+    setActiveTab('manual');
+    setBulkUrls('');
   };
 
   const handleDeleteProject = async (id: string) => {
@@ -160,6 +208,33 @@ function App() {
       setSelectedProject(updated.find(p => p.id === selectedProject.id) || null);
     } catch (err) {
       setError('Failed to add URL');
+    }
+  };
+
+  const handleBulkAddURLs = async (lessonId: string) => {
+    if (!selectedProject || !bulkUrls.trim()) return;
+
+    // Split by newlines or regex for http/m3u8
+    const urls = bulkUrls
+      .split(/[\n\s]+/)
+      .map(u => u.trim())
+      .filter(u => u.length > 0 && (u.startsWith('http') || u.endsWith('.m3u8')));
+
+    if (urls.length === 0) {
+      setError('No valid URLs found');
+      return;
+    }
+
+    try {
+      for (const url of urls) {
+        await addURL(selectedProject.id, lessonId, { url });
+      }
+      const updated = await fetchProjects();
+      setSelectedProject(updated.find(p => p.id === selectedProject.id) || null);
+      setShowBulkAdd(null);
+      setBulkUrls('');
+    } catch (err) {
+      setError('Failed to bulk add URLs');
     }
   };
 
@@ -345,13 +420,51 @@ function App() {
                           {lesson.urls.length} URL{lesson.urls.length !== 1 ? 's' : ''}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteLesson(lesson.id); }}
-                        className="p-1.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-all"
-                      >
-                        <TrashIcon />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowBulkAdd(showBulkAdd?.lessonId === lesson.id ? null : { lessonId: lesson.id });
+                          }}
+                          className="p-1.5 rounded hover:bg-[var(--accent-primary)]/20 text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-all"
+                          title="Bulk Add URLs"
+                        >
+                          <BulkIcon />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteLesson(lesson.id); }}
+                          className="p-1.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-all"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Bulk Add Area */}
+                    {showBulkAdd?.lessonId === lesson.id && (
+                      <div className="px-4 pb-4 animate-fade-in border-t border-[var(--border-color)] bg-[var(--bg-secondary)] pt-4">
+                        <textarea
+                          value={bulkUrls}
+                          onChange={(e) => setBulkUrls(e.target.value)}
+                          placeholder="Paste multiple URLs here (one per line or space separated)..."
+                          className="w-full h-24 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] focus:outline-none text-sm mb-2"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setShowBulkAdd(null)}
+                            className="px-3 py-1.5 text-sm rounded-lg hover:bg-[var(--bg-hover)]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleBulkAddURLs(lesson.id)}
+                            className="px-3 py-1.5 text-sm rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-secondary)]"
+                          >
+                            Add All
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {expandedLessons.has(lesson.id) && (
                       <div className="px-4 pb-4 border-t border-[var(--border-color)] pt-4 space-y-2 animate-fade-in">
@@ -400,6 +513,23 @@ function App() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="glass rounded-2xl p-6 w-full max-w-md m-4 animate-fade-in">
             <h2 className="text-xl font-bold mb-4">New Project</h2>
+
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 border-b border-[var(--border-color)]">
+              <button
+                onClick={() => setActiveTab('manual')}
+                className={`flex-1 pb-2 border-b-2 transition-colors ${activeTab === 'manual' ? 'border-[var(--accent-primary)] text-white' : 'border-transparent text-[var(--text-muted)] hover:text-white'}`}
+              >
+                Manual Setup
+              </button>
+              <button
+                onClick={() => setActiveTab('import')}
+                className={`flex-1 pb-2 border-b-2 transition-colors ${activeTab === 'import' ? 'border-[var(--accent-primary)] text-white' : 'border-transparent text-[var(--text-muted)] hover:text-white'}`}
+              >
+                Import Template
+              </button>
+            </div>
+
             <form onSubmit={handleCreateProject} className="space-y-4">
               <div>
                 <label className="block text-sm text-[var(--text-secondary)] mb-1">Project Name</label>
@@ -409,9 +539,35 @@ function App() {
                   onChange={(e) => setNewProjectName(e.target.value)}
                   placeholder="My Course"
                   className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] focus:outline-none"
-                  autoFocus
                 />
               </div>
+
+              {activeTab === 'manual' ? (
+                <div>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1">Number of Lessons</label>
+                  <input
+                    type="number"
+                    value={lessonCount}
+                    onChange={(e) => setLessonCount(Math.max(1, parseInt(e.target.value) || 1))}
+                    min="1"
+                    className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] focus:outline-none"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1 flex justify-between">
+                    <span>Template Content</span>
+                    <span className="text-xs text-[var(--text-muted)]">JSON or Plain List</span>
+                  </label>
+                  <textarea
+                    value={importContent}
+                    onChange={(e) => setImportContent(e.target.value)}
+                    placeholder='{"name": "Course", "lessons": ["Intro", "Ch1"]} OR Just a list of titles'
+                    className="w-full h-32 px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] focus:outline-none text-sm font-mono"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm text-[var(--text-secondary)] mb-1">Save Location</label>
                 <div className="flex gap-2">
@@ -433,25 +589,16 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm text-[var(--text-secondary)] mb-1">Number of Lessons</label>
-                <input
-                  type="number"
-                  value={lessonCount}
-                  onChange={(e) => setLessonCount(Math.max(1, parseInt(e.target.value) || 1))}
-                  min="1"
-                  className="w-full px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] focus:outline-none"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNewProject(false)}
+                  onClick={() => { setShowNewProject(false); resetForms(); }}
                   className="flex-1 px-4 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:bg-[var(--bg-hover)]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={!newProjectName || !newProjectLocation}
+                  disabled={!newProjectLocation || (activeTab === 'manual' && !newProjectName) || (activeTab === 'import' && !importContent)}
                   className="flex-1 px-4 py-2 rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-secondary)] disabled:opacity-50 font-medium"
                 >
                   Create

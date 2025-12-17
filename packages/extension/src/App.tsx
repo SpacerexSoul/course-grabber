@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './index.css';
 
 interface DetectedVideo {
-  type: 'video' | 'iframe';
+  type: 'video' | 'iframe' | 'stream';
   src: string;
 }
 
@@ -31,25 +31,46 @@ function App() {
     });
   }, []);
 
-  const sendToApp = async (url: string) => {
+  const copyToClipboard = async (text: string) => {
     try {
-      // Assuming desktop app is running on localhost:5173 (React) or accessed via clipboard
-      // For now, we'll write to clipboard as a simple bridge
-      await navigator.clipboard.writeText(url);
-      setStatus('Copied to clipboard! Paste in App.');
-
-      // Clear status after 2 seconds
+      await navigator.clipboard.writeText(text);
+      setStatus('Copied!');
       setTimeout(() => setStatus(null), 2000);
     } catch (err) {
       setStatus('Failed to copy.');
     }
   };
 
+  const copyAll = async () => {
+    const allUrls = videos.map(v => v.src).join('\n');
+    if (allUrls) {
+      await copyToClipboard(allUrls);
+      setStatus('All URLs copied!');
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'iframe': return 'bg-purple-500/20 text-purple-400';
+      case 'stream': return 'bg-green-500/20 text-green-400';
+      default: return 'bg-blue-500/20 text-blue-400';
+    }
+  };
+
   return (
-    <div className="w-80 min-h-[300px] bg-[#0f0f0f] text-white p-4">
+    <div className="w-96 min-h-[300px] bg-[#0f0f0f] text-white p-4">
       <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
         <h1 className="text-lg font-bold text-indigo-500">Course Grabber</h1>
-        <div className="text-xs text-gray-500">v1.0</div>
+        <div className="flex gap-2">
+          {videos.length > 0 && (
+            <button
+              onClick={copyAll}
+              className="px-2 py-1 text-xs font-medium bg-[#1a1a1a] border border-gray-700 hover:bg-[#252525] rounded transition-colors"
+            >
+              Copy All ({videos.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {status && (
@@ -58,7 +79,7 @@ function App() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
         {loading ? (
           <div className="text-center text-gray-500 py-8">Scanning page...</div>
         ) : videos.length === 0 ? (
@@ -67,22 +88,22 @@ function App() {
           </div>
         ) : (
           videos.map((video, idx) => (
-            <div key={idx} className="bg-[#1a1a1a] p-3 rounded-lg border border-gray-800 hover:border-indigo-500/50 transition-all group">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ${video.type === 'iframe' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'
-                  }`}>
-                  {video.type.toUpperCase()}
+            <div key={idx} className="bg-[#1a1a1a] p-3 rounded-lg border border-gray-800 hover:border-indigo-500/50 transition-all group flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ${getTypeColor(video.type)}`}>
+                  {video.type}
                 </span>
-                <span className="flex-1 text-xs truncate text-gray-400" title={video.src}>
-                  {video.src}
-                </span>
+                <button
+                  onClick={() => copyToClipboard(video.src)}
+                  className="text-xs text-gray-500 hover:text-white transition-colors"
+                  title="Copy single URL"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                </button>
               </div>
-              <button
-                onClick={() => sendToApp(video.src)}
-                className="w-full py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-xs font-medium transition-colors"
-              >
-                Copy URL
-              </button>
+              <div className="text-xs text-gray-400 break-all font-mono bg-black/20 p-1.5 rounded select-all">
+                {video.src}
+              </div>
             </div>
           ))
         )}

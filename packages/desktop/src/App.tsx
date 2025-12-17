@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import './index.css';
 import {
-  Project,
+  type Project,
   fetchProjects,
   createProject,
   deleteProject,
@@ -263,8 +263,8 @@ function App() {
                   key={project.id}
                   onClick={() => setSelectedProject(project)}
                   className={`no-drag group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all mb-1 ${selectedProject?.id === project.id
-                      ? 'bg-[var(--accent-primary)]/20 border border-[var(--accent-primary)]/50'
-                      : 'hover:bg-[var(--bg-hover)]'
+                    ? 'bg-[var(--accent-primary)]/20 border border-[var(--accent-primary)]/50'
+                    : 'hover:bg-[var(--bg-hover)]'
                     }`}
                 >
                   <div className="flex-1 min-w-0">
@@ -366,9 +366,9 @@ function App() {
                             <span className="text-xs text-[var(--text-muted)] w-8">#{url.part_number}</span>
                             <span className="flex-1 text-sm truncate text-[var(--text-secondary)]">{url.url}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${url.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                url.status === 'failed' ? 'bg-red-500/20 text-red-400' :
-                                  url.status === 'downloading' ? 'bg-blue-500/20 text-blue-400' :
-                                    'bg-gray-500/20 text-gray-400'
+                              url.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                                url.status === 'downloading' ? 'bg-blue-500/20 text-blue-400' :
+                                  'bg-gray-500/20 text-gray-400'
                               }`}>
                               {url.status}
                             </span>

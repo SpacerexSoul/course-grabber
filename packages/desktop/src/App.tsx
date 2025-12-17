@@ -218,14 +218,8 @@ function App() {
   return (
     <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
       {/* Title Bar */}
-      <div className="drag-region h-12 flex items-center justify-between px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-          <div className="w-3 h-3 rounded-full bg-green-500"></div>
-        </div>
+      <div className="drag-region h-12 flex items-center justify-center bg-[var(--bg-secondary)] border-b border-[var(--border-color)] relative">
         <h1 className="gradient-text font-bold text-lg">Course Grabber</h1>
-        <div className="w-20"></div>
       </div>
 
       {/* Error Banner */}

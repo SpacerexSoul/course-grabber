@@ -555,9 +555,23 @@ function App() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm text-[var(--text-secondary)] mb-1 flex justify-between">
-                    <span>Template Content</span>
-                    <span className="text-xs text-[var(--text-muted)]">JSON or Plain List</span>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1 flex justify-between items-center">
+                    <div>
+                      <span>Template Content</span>
+                      <span className="text-xs text-[var(--text-muted)] ml-2">JSON or Plain List</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prompt = `I need to structure a video course for: [INSERT TOPIC]\n\nPlease generate a course structure and output it strictly in the following JSON format for the "Course Grabber" application. Do not include markdown formatting or backticks, just the raw JSON.\n\nJSON Template:\n{\n  "name": "Course Title",\n  "lessons": [\n    "Module 1: Title",\n    "Module 2: Title"\n  ]\n}`;
+                        navigator.clipboard.writeText(prompt);
+                        alert('AI Prompt copied! Paste it into ChatGPT/Claude.');
+                      }}
+                      className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-secondary)] flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      Copy AI Prompt
+                    </button>
                   </label>
                   <textarea
                     value={importContent}

@@ -31,6 +31,6 @@ export default defineManifest({
       run_at: 'document_idle',
     },
   ],
-  permissions: ['activeTab', 'scripting'],
+  permissions: ['activeTab', 'scripting', 'webRequest', 'storage'],
   host_permissions: ['<all_urls>'],
 })
